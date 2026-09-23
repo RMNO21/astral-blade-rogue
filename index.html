@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Astral Pulse | موج ضربتی بی‌پایان با وبکم</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700&family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <!-- MediaPipe Hands & Camera Utils CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <!-- Hidden webcam stream -->
+  <video id="webcam-video" playsinline style="display:none;"></video>
+
+  <!-- Main Game Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Virtual Holographic Hand Cursor for Menu Navigation -->
+  <div id="hand-cursor" class="hand-cursor">
+    <div class="cursor-dot"></div>
+    <svg class="cursor-ring" viewBox="0 0 36 36">
+      <path class="cursor-ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+      <path id="cursor-progress-bar" class="cursor-ring-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+    </svg>
+    <span id="cursor-label" class="cursor-label"></span>
+  </div>
+
+  <!-- Live Hand PIP Box -->
+  <div id="webcam-pip" class="pip-container">
+    <div class="pip-header">
+      <span>ردیاب دست</span>
+      <button id="pip-toggle" title="تغییر سایز">➖</button>
+    </div>
+    <canvas id="pip-canvas" width="160" height="120"></canvas>
+  </div>
+
+  <!-- In-Game HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-top-right">
+      <!-- Health Bar -->
+      <div class="hud-bar-group">
+        <div class="hud-bar-label">سلامتی</div>
+        <div class="hud-bar-outer health">
+          <div id="hud-health-fill" class="hud-bar-fill health-fill" style="width: 100%;"></div>
+        </div>
+        <span id="hud-health-text" class="hud-num">100 HP</span>
+      </div>
+
+      <!-- Pulse Status -->
+      <div class="pulse-status-badge">
+        <span id="hud-pulse-status">🖐️ دست باز: پالس سریع آماده (۰.۳۵s)</span>
+      </div>
+    </div>
+
+    <div class="hud-top-center">
+      <div class="hud-stat-box">
+        <span class="hud-stat-label">زمان بقا</span>
+        <span id="hud-time-val" class="hud-stat-value">00:00</span>
+      </div>
+      <div class="hud-stat-box">
+        <span class="hud-stat-label">سختی</span>
+        <span id="hud-diff-val" class="hud-stat-value diff-text">1.0x</span>
+      </div>
+    </div>
+
+    <div class="hud-top-left">
+      <div class="hud-stat-box">
+        <span class="hud-stat-label">امتیاز</span>
+        <span id="hud-score-val" class="hud-stat-value">0</span>
+      </div>
+      <div class="hud-stat-box">
+        <span class="hud-stat-label">بهترین رکورد</span>
+        <span id="hud-highscore-val" class="hud-stat-value gold-text">0</span>
+      </div>
+      <div class="hud-controls-group">
+        <span id="hud-tracking-badge" class="badge-searching">● اتصال...</span>
+        <button id="btn-toggle-input" class="hud-btn" title="تغییر وبکم / ماوس">🎮</button>
+        <button id="btn-fullscreen" class="hud-btn" title="تمام صفحه">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. Simple Main Menu -->
+  <div id="screen-menu" class="ui-screen">
+    <div class="menu-content glass-panel">
+      <div class="title-container">
+        <div class="game-tag">ENDLESS WEBCAM ARCADE</div>
+        <h1 class="game-title">ASTRAL PULSE</h1>
+        <div class="game-subtitle">موج ضربتی بی‌پایان</div>
+      </div>
+
+      <div class="rules-card">
+        <div class="rule-row">
+          <span class="rule-icon">🖐️</span>
+          <div><strong>دست باز (حرکت و فرار):</strong> کاراکتر آزادانه حرکت می‌کند و از تیرها فرار می‌کند.</div>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">✊</span>
+          <div><strong>دست بسته (توقف و شارژ پالس):</strong> کاراکتر در جای خود قفل شده و موج شارژ می‌کند.</div>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">⚡</span>
+          <div><strong>شارژ متغیر (Anti-Camping):</strong> بار اول کمتر از نیم ثانیه (۰.۳۵ ثانیه) است! در صورت استفاده پیاپی، زمان شارژ تا ۳ ثانیه سنگین می‌شود. با <strong>۱ ثانیه حرکت و فرار</strong>، پالس سریع دوباره آماده می‌شود!</div>
+        </div>
+        <div class="rule-row">
+          <span class="rule-icon">🏹</span>
+          <div><strong>دشمنان فلش‌مانند:</strong> نزدیک می‌شوند و شلیک می‌کنند؛ با موج پالس تیرها را بازتاب دهید یا از نزدیک نابودشان کنید!</div>
+        </div>
+      </div>
+
+      <div class="menu-actions">
+        <button id="btn-start-game" class="menu-btn primary pulse">
+          🚀 شروع بازی با وبکم (یا ماوس)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Game Over & Retry Screen -->
+  <div id="screen-game-over" class="ui-screen hidden">
+    <div class="gameover-content glass-panel">
+      <h2 class="gameover-title">سقوط کاراکتر</h2>
+      <p class="gameover-sub">سلامتی شما به پایان رسید!</p>
+
+      <div class="run-summary-grid">
+        <div>امتیاز شما: <strong id="summary-score">0</strong></div>
+        <div>بهترین رکورد (High Score): <strong id="summary-highscore" class="gold-text">0</strong></div>
+        <div>مدت زمان بقا: <strong id="summary-time">0s</strong></div>
+        <div>دشمنان نابود شده: <strong id="summary-kills">0</strong></div>
+      </div>
+
+      <div class="summary-actions">
+        <button id="btn-retry-run" class="menu-btn primary pulse">
+          🔄 تلاش دوباره (RETRY)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
